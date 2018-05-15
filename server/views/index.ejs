@@ -7,6 +7,11 @@
 </head>
 <body style="font-family:Calibri,Tahoma,sans-serif;">
 	<h1>Dröpbox</h1>
+	<ul>
+	<% files.forEach(e => { %>
+		<li><a href="/dl?id=<%= encodeURIComponent(e) %>"><%= e %></a></li>
+	<% }); %>
+	</ul>
 	<script>
 	</script>
 </body>
