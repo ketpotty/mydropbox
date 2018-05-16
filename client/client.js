@@ -1,22 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 const watch = require('node-watch');
-const thedir = 'dropbox';
 const mkdirp = require('mkdirp');
 const walkSync = (d) => fs.statSync(d).isDirectory() ? fs.readdirSync(d).map(f => walkSync(path.join(d, f))).reduce((a, b) => a.concat(b), []) : d;
+
+const thedir = 'dropbox';
+const onlydir = "/home/vagrant/apps/done/mydropbox/client/dropbox";
 
 // ------------------------------------------------------------
 // client.js - base code copyied from https://www.npmjs.com/package/socket.io-client
 // ------------------------------------------------------------
 var socket = require('socket.io-client')('http://192.168.10.2:3000');
-
-socket.on('connect', function(){
-	console.log("Connected");
-});
-
-socket.on('disconnect', function(){
-
-});
 
 var fnQueue = [];
 var syncTimeout = null;
@@ -72,18 +66,17 @@ function startSync() {
 };
 
 function initialSync() {
-	walkSync(thedir).map(e => {
-		//console.log(e.substr(thedir.length + 1));
-		//addItem(e.substr(thedir.length + 1));
-		addItem(e);
+	var hasfiles = walkSync(thedir);
+	socket.emit('initsync', {
+		files: hasfiles.map(e => e.substr(thedir.length + 1))
 	});
+	// hasfiles.map(e => addItem(e)) rövidebben (fancy :) hasfiles.map(addItem)
+	hasfiles.map(addItem);
 };
 
 /**
  * Main watch
  */
-initialSync();
-
 function addItem(filename) {
 	if (fnQueue.filter(e => (e.filename == filename)).length > 0) {
 		return;
@@ -101,3 +94,41 @@ function addItem(filename) {
 };
 
 watch(thedir, {recursive: true}, (et, filename) => addItem(filename));
+
+
+// ------------------------------------------------------------
+socket.on('connect', function(){
+	console.log("Connected");
+});
+
+socket.once('connect', function(){
+	console.log("Initial sync starting...");
+	initialSync();
+});
+
+socket.on('save', function(data){
+	//console.log((new Date()).toISOString() + ' - Save ', data);
+	var filename = thedir + '/' + data.filename;
+	var filerel = path.resolve(filename);
+	// ensure dir
+	if (filerel.substr(0, onlydir.length) != onlydir) {
+		return console.log("NONONONONO!");
+	};
+	mkdirp(path.dirname(filerel), function (err) {
+		if (err != null && err.errno != -17) {
+			return console.error(err);
+		};
+		//console.log("Debug before writeFile: ", filename, queueItem);
+		fs.writeFile(filename, data.content, (err) => {
+			if (err != null && err.errno != -17) {
+				return console.error(err);
+			};
+			// file write done
+			return console.log((new Date()).toISOString() + ' - ' + filename + ' successfully written');
+		});
+	});
+});
+
+socket.on('disconnect', function(){
+
+});

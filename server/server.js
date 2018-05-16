@@ -44,23 +44,25 @@ function processQueue() {
 	};
 
 	queueItem = fnQueue.shift();
+	// --------------------------------------------------------
+	console.log((new Date()).toISOString() + ' - processing ' + queueItem.action, queueItem.data);
 	var filename = store + '/' + queueItem.data.filename;
 	var filerel = path.resolve(filename);
+	//console.log(filerel);
+	// ensure dir
 	if (filerel.substr(0, onlydir.length) != onlydir) {
 		return console.log("NONONONONO!");
 	};
-	console.log((new Date()).toISOString() + ' - processing: ', queueItem);
 	// process - mod
 	if (queueItem.action == 'mod') {
-		// ensure dir
 		//console.log("Debug before mkdirp: ", filerel, queueItem);
 		mkdirp(path.dirname(filerel), function (err) {
-			console.log("Debug during mkdirp: ", err, queueItem);
+			//console.log("Debug during mkdirp: ", err, queueItem);
 			if (err != null && err.errno != -17) {
 				console.error(err);
 				return end();
 			};
-			console.log("Debug before writeFile: ", filename, queueItem);
+			//console.log("Debug before writeFile: ", filename, queueItem);
 			fs.writeFile(filename, queueItem.data.content, (err) => {
 				if (err != null && err.errno != -17) {
 					console.error(err);
@@ -73,10 +75,6 @@ function processQueue() {
 	};
 	// process - delete
 	if (queueItem.action == 'delete') {
-		//console.log(filerel);
-		if (filerel.substr(0, onlydir.length) != onlydir) {
-			return console.log("NONONONONO!");
-		};
 		fs.unlink(filerel, (err) => {
 			if (err) {
 				console.error(err);
@@ -86,25 +84,67 @@ function processQueue() {
 			return end();
 		});
 	};
+	// process - initsync
+	if (queueItem.action == 'initsync') {
+		var atserver = walkSync(store).map(e => e.substr(store.length + 1));
+		var atclient = queueItem.data.files;
+		var needToSync = atserver.filter(e => atclient.indexOf(e) == -1);
+		//console.log('Need to sync: ', needToSync);
+		needToSync.forEach(function(item) {
+			fnQueue.push({
+				action: 'sendToClient',
+				data: {
+					filename: item
+				},
+				socket: queueItem.socket
+			});
+		});
+		return end();
+	};
+	// process - sendToClient
+	if (queueItem.action == 'sendToClient') {
+		fs.readFile(filename, (err, filecontent) => {
+			if (err) {
+				console.error(err);
+				// the rest is silence... :)
+				queueItem = null;
+				return setTimeout(startSync, 0);
+			};
+			console.log((new Date()).toISOString() + ' - Sending to client ' + filename);
+			queueItem.socket.emit('save', {
+				filename: filename.substr(store.length + 1),
+				content: filecontent
+			});
+			return end();
+		});
+	};
 };
 
 io.on('connection', function (socket) {
 	console.log("Client connected");
 	//socket.emit('mod', { hello: 'world' });
 	socket.on('mod', function (data) {
-		console.log(data);
 		// rövidített írásmód: data kulcshoz data tartalom fog érkezni :)
 		fnQueue.push({
 			action: 'mod',
-			data
+			data,
+			socket
 		});
 		return setTimeout(processQueue, 0);
 	});
 	socket.on('delete', function (data) {
-		console.log(data);
 		fnQueue.push({
 			action: 'delete',
-			data
+			data,
+			socket
+		});
+		return setTimeout(processQueue, 0);
+	});
+	socket.on('initsync', function(data) {
+		fnQueue.push({
+			action: 'initsync',
+			data,
+			socket
 		});
 		return setTimeout(processQueue, 0);
 	});
