@@ -131,6 +131,7 @@ io.on('connection', function (socket) {
 			socket
 		});
 		return setTimeout(processQueue, 0);
+		socket.broadcast.emit('save', data);
 	});
 	socket.on('delete', function (data) {
 		fnQueue.push({

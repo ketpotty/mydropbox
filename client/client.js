@@ -16,6 +16,8 @@ var fnQueue = [];
 var syncTimeout = null;
 var queueItem = null;
 
+var dowatch = true;
+
 /**
  * Start sync for the queue
  */
@@ -93,7 +95,11 @@ function addItem(filename) {
 	syncTimeout = setTimeout(startSync, 200);
 };
 
-watch(thedir, {recursive: true}, (et, filename) => addItem(filename));
+watch(thedir, {recursive: true}, (et, filename) => {
+	if (dowatch) {
+		addItem(filename);
+	};
+});
 
 
 // ------------------------------------------------------------
@@ -114,12 +120,14 @@ socket.on('save', function(data){
 	if (filerel.substr(0, onlydir.length) != onlydir) {
 		return console.log("NONONONONO!");
 	};
+	dowatch = false;
 	mkdirp(path.dirname(filerel), function (err) {
 		if (err != null && err.errno != -17) {
 			return console.error(err);
 		};
 		//console.log("Debug before writeFile: ", filename, queueItem);
 		fs.writeFile(filename, data.content, (err) => {
+			dowatch = true;
 			if (err != null && err.errno != -17) {
 				return console.error(err);
 			};
