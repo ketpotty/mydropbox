@@ -42,7 +42,7 @@ function startSync() {
 			}
 			console.log((new Date()).toISOString() + ' - Deleted ' + queueItem.filename);
 			socket.emit('delete', {
-				filename: queueItem.filename.replace(thedir + '/', '')
+				filename: queueItem.filename.substr(thedir.length + 1).replace(/\\/g, '/')
 			});
 			queueItem = null;
 			return setTimeout(startSync, 0);
@@ -58,7 +58,7 @@ function startSync() {
 			};
 			console.log((new Date()).toISOString() + ' - Modified ' + queueItem.filename);
 			socket.emit('mod', {
-				filename: queueItem.filename.replace(thedir + '/', ''),
+				filename: queueItem.filename.substr(thedir.length + 1).replace(/\\/g, '/'),
 				content: filecontent
 			});
 			queueItem = null;
@@ -70,7 +70,7 @@ function startSync() {
 function initialSync() {
 	var hasfiles = walkSync(thedir);
 	socket.emit('initsync', {
-		files: hasfiles.map(e => e.substr(thedir.length + 1))
+		files: hasfiles.map(e => e.substr(thedir.length + 1).replace(/\\/g, '/'))
 	});
 	// hasfiles.map(e => addItem(e)) rövidebben (fancy :) hasfiles.map(addItem)
 	hasfiles.map(addItem);

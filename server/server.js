@@ -121,7 +121,7 @@ function processQueue() {
 };
 
 io.on('connection', function (socket) {
-	console.log("Client connected");
+	console.log("Client connected from " + socket.conn.remoteAddress);
 	//socket.emit('mod', { hello: 'world' });
 	socket.on('mod', function (data) {
 		// rövidített írásmód: data kulcshoz data tartalom fog érkezni :)
